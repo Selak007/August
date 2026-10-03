@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>August — Local Voice Browser Agent</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="panel">
+
+    <!-- Header -->
+    <header class="panel-header">
+      <div class="header-left">
+        <span class="logo">◉ AUGUST</span>
+        <span class="badge badge-ok" id="status-badge">● Standalone Ready</span>
+      </div>
+      <div class="header-right">
+        <button id="tts-toggle-btn" class="icon-btn tts-on" title="Toggle Voice Feedback (TTS)">
+          <span id="tts-icon">🔊</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Voice Capture Card -->
+    <section class="card mic-hero-card" id="card-mic-hero">
+      <button id="mic-btn" class="mic-button" title="Click to Speak">
+        <div class="mic-pulse"></div>
+        <span class="mic-icon">🎙</span>
+      </button>
+      <div class="mic-hero-text">
+        <div class="mic-hero-title" id="mic-label">Click Mic to Speak</div>
+        <div class="mic-hero-sub">Or use shortcut: <kbd>Ctrl+Shift+Space</kbd></div>
+      </div>
+    </section>
+
+    <!-- Status row -->
+    <section class="card" id="card-status">
+      <div class="card-header-row">
+        <div class="label">STATUS</div>
+        <div class="sub-label" id="tier-badge">STANDALONE EXTENSION</div>
+      </div>
+      <div class="value" id="status-text">Ready — No Backend Required</div>
+    </section>
+
+    <!-- Transcript row -->
+    <section class="card" id="card-transcript" style="display:none">
+      <div class="label">YOU SAID</div>
+      <div class="value mono transcript-val" id="transcript-text"></div>
+    </section>
+
+    <!-- Intent row -->
+    <section class="card" id="card-intent" style="display:none">
+      <div class="label">ACTION RESOLVED</div>
+      <div class="value mono action-val" id="intent-text"></div>
+    </section>
+
+    <!-- Error row -->
+    <section class="card error-card" id="card-error" style="display:none">
+      <div class="label">ALERT / ERROR</div>
+      <div class="value mono" id="error-text"></div>
+    </section>
+
+    <!-- Browser context section -->
+    <section class="card context-card" id="card-context" style="display:none">
+      <div class="label">LIVE BROWSER CONTEXT</div>
+      <div class="context-row" id="ctx-title-row" style="display:none">
+        <span class="ctx-key">Page</span>
+        <span class="ctx-val" id="ctx-title"></span>
+      </div>
+      <div class="context-row" id="ctx-url-row" style="display:none">
+        <span class="ctx-key">URL</span>
+        <span class="ctx-val mono" id="ctx-url"></span>
+      </div>
+      <div class="context-row" id="ctx-sel-row" style="display:none">
+        <span class="ctx-key">Selected</span>
+        <span class="ctx-val mono" id="ctx-sel"></span>
+      </div>
+    </section>
+
+    <!-- Manual command tester -->
+    <section class="card dev-card">
+      <div class="label">TYPE OR RUN COMMAND</div>
+      <div class="dev-row">
+        <input type="text" id="dev-input" class="dev-input"
+               placeholder='e.g. open smart, scroll down' />
+        <button id="dev-send" class="btn-send" title="Execute">▶</button>
+      </div>
+      <div class="dev-result" id="dev-result"></div>
+    </section>
+
+    <!-- Activity History -->
+    <section class="card history-card" id="card-history">
+      <div class="label">RECENT ACTIVITY</div>
+      <div class="history-list" id="history-list">
+        <div class="history-empty">Click the mic or type a command to get started.</div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="panel-footer">
+      <span>August 1.0 · 100% Local & Free Chrome Extension</span>
+    </footer>
+  </div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>
