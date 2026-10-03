@@ -93,7 +93,7 @@ class GoForwardCommand(BaseModel):
 class ScrollCommand(BaseModel):
     action: Literal[Action.SCROLL] = Action.SCROLL
     direction: ScrollDirection = ScrollDirection.DOWN
-    amount: int = Field(default=400, ge=1, le=5000)
+    amount: int = Field(default=400, ge=1, le=20000)
 
 
 class SearchCommand(BaseModel):

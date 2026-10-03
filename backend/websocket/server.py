@@ -36,7 +36,35 @@ class ExtensionBridge:
 
     # ── Connection lifecycle ──────────────────────────────────────────────────
 
-    async def connect(self, ws: WebSocket) -> None:
+    async def connect(self, ws: WebSocket) -> bool:
+        """
+        Validate origin and authentication token before accepting connection.
+        Rejects any malicious webpage trying to open a WebSocket from the browser.
+        """
+        from backend.config import config
+
+        origin = ws.headers.get("origin", "").lower()
+        token = ws.query_params.get("token") or ws.headers.get("x-auth-token")
+
+        # 1. Validate Origin header
+        if origin:
+            is_allowed = any(
+                origin.startswith(prefix) for prefix in config.server.allowed_origin_prefixes
+            )
+            if not is_allowed:
+                logger.warning(
+                    "[SECURITY] Rejected WebSocket connection from unauthorized origin: %r",
+                    origin
+                )
+                await ws.close(code=status.WS_1008_POLICY_VIOLATION, reason="Unauthorized origin")
+                return False
+
+        # 2. Validate Auth Token if token is provided or enforced
+        if token and token != config.server.auth_token:
+            logger.warning("[SECURITY] Rejected WebSocket connection with invalid auth token.")
+            await ws.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid authentication token")
+            return False
+
         await ws.accept()
         async with self._lock:
             if self._ws is not None:
@@ -48,7 +76,10 @@ class ExtensionBridge:
                 except Exception:
                     pass
             self._ws = ws
+
+        logger.info("[SECURITY] Connection accepted. Origin: %s", origin or "(direct client)")
         logger.info("[WS] Chrome extension connected.")
+        return True
 
     async def disconnect(self) -> None:
         async with self._lock:

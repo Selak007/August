@@ -183,53 +183,80 @@ class PushToTalkRecorder:
         except Exception as exc:
             logger.error("[STT] Transcription error: %s", exc)
 
-    # ── Hotkey listener ───────────────────────────────────────────────────────
+    # ── Hotkey listener (Non-Admin pynput with keyboard fallback) ─────────────
 
     def start(self, warm_up: bool = True) -> None:
         """
-        Block and listen for Ctrl+Space hotkey.
+        Listen for Ctrl+Space hotkey without requiring Windows Administrator rights.
 
         Press  → start recording
         Release → stop, transcribe, call on_result
-
-        Press Ctrl+C to exit.
         """
         if warm_up:
             logger.info("[REC] Pre-loading Whisper model (warm-up)…")
             self._stt.warm_up()
-            logger.info("[REC] Ready. Press Ctrl+Space to record.")
+            logger.info("[REC] Ready. Hold Ctrl+Space to record.")
 
-        try:
-            import keyboard  # imported here so module loads without it
-        except ImportError:
-            raise ImportError(
-                "Install the 'keyboard' package:  pip install keyboard"
-            )
-
-        print(f"\n  August — Push-to-Talk")
+        print(f"\n  August — Push-to-Talk (Non-Admin)")
         print(f"  Hold {HOTKEY.upper()} to record. Ctrl+C to quit.\n")
 
-        def on_press(event):
-            if not self._recording:
-                self._start_recording()
-
-        def on_release(event):
-            if self._recording:
-                self._stop_recording(reason="key_release")
-
-        keyboard.on_press_key("space", on_press,   suppress=False)
-        keyboard.on_release_key("space", on_release, suppress=False)
-
+        # ── Primary: pynput (Zero Administrator required) ─────────────────────
         try:
-            keyboard.wait()   # block until Ctrl+C
-        except KeyboardInterrupt:
-            logger.info("[REC] Exiting.")
-        finally:
-            keyboard.unhook_all()
+            from pynput import keyboard as pyn_kb
+
+            ctrl_pressed = False
+
+            def on_press(key):
+                nonlocal ctrl_pressed
+                if key in (pyn_kb.Key.ctrl_l, pyn_kb.Key.ctrl_r, pyn_kb.Key.ctrl):
+                    ctrl_pressed = True
+                elif key == pyn_kb.Key.space and ctrl_pressed:
+                    if not self._recording:
+                        self._start_recording()
+
+            def on_release(key):
+                nonlocal ctrl_pressed
+                if key in (pyn_kb.Key.ctrl_l, pyn_kb.Key.ctrl_r, pyn_kb.Key.ctrl):
+                    ctrl_pressed = False
+                    if self._recording:
+                        self._stop_recording(reason="ctrl_release")
+                elif key == pyn_kb.Key.space:
+                    if self._recording:
+                        self._stop_recording(reason="space_release")
+
+            self._listener = pyn_kb.Listener(on_press=on_press, on_release=on_release)
+            self._listener.start()
+            self._stop_event.wait()
+            return
+
+        except Exception as err:
+            logger.warning("[REC] pynput listener initialization note: %s. Trying fallback…", err)
+
+        # ── Fallback: keyboard library ────────────────────────────────────────
+        try:
+            import keyboard
+            def on_press(event):
+                if not self._recording:
+                    self._start_recording()
+
+            def on_release(event):
+                if self._recording:
+                    self._stop_recording(reason="key_release")
+
+            keyboard.on_press_key("space", on_press, suppress=False)
+            keyboard.on_release_key("space", on_release, suppress=False)
+            keyboard.wait()
+        except Exception as exc:
+            logger.error("[REC] Keyboard listener failed: %s", exc)
 
     def stop_listening(self) -> None:
         """Programmatic shutdown."""
         self._stop_event.set()
+        if hasattr(self, "_listener") and self._listener:
+            try:
+                self._listener.stop()
+            except Exception:
+                pass
         try:
             import keyboard
             keyboard.unhook_all()

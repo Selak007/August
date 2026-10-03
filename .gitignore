@@ -5,8 +5,11 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+# Distribution & Archives
 dist/
 build/
+*.zip
+*.crx
 
 # Logs
 *.log

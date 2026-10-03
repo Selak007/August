@@ -85,7 +85,9 @@ app.add_middleware(
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
-    await bridge.connect(ws)
+    accepted = await bridge.connect(ws)
+    if not accepted:
+        return
     try:
         await bridge.receive_loop(ws)
     except WebSocketDisconnect:
