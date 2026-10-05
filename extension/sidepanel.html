@@ -40,7 +40,12 @@
       <div class="mic-hero-text">
         <div class="mic-hero-title" id="mic-label">Click Mic to Speak</div>
         <div class="mic-hero-sub" id="mic-sub">Shortcut: <kbd id="shortcut-kbd">Ctrl+Shift+Space</kbd> · say <em>"help"</em></div>
+        <div class="engine-badge" id="engine-badge">🔒 100% Offline Whisper</div>
         <div class="interim" id="interim-text"></div>
+        <div class="progress-bar-container" id="model-progress" style="display:none">
+          <div class="progress-label" id="progress-label">Loading Whisper model…</div>
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        </div>
       </div>
     </section>
 
@@ -61,7 +66,25 @@
         <button class="link-btn" id="settings-close">close</button>
       </div>
       <form id="settings-form" class="settings-form">
-        <div class="settings-group">Voice</div>
+        <div class="settings-group">Speech Recognition (Speech-to-Text)</div>
+        <label class="row">
+          Engine
+          <select name="sttEngine" id="stt-engine-select">
+            <option value="whisper_offline">In-Browser Whisper (100% Offline & Private)</option>
+            <option value="web_speech">Chrome Web Speech (Google Cloud)</option>
+          </select>
+        </label>
+        <label class="row" id="whisper-model-row">
+          Whisper Model
+          <select name="whisperModel">
+            <option value="Xenova/whisper-tiny.en">whisper-tiny.en (~39MB, Fast, English)</option>
+            <option value="Xenova/whisper-tiny">whisper-tiny (~39MB, Multilingual)</option>
+            <option value="Xenova/whisper-base.en">whisper-base.en (~73MB, Accurate, English)</option>
+          </select>
+        </label>
+        <div class="hint-text" id="engine-hint">In-Browser Whisper processes your speech entirely on your CPU with WebAssembly. No audio is ever sent to Google or anywhere else.</div>
+
+        <div class="settings-group">Voice & Playback</div>
         <label class="row"><input type="checkbox" name="ttsEnabled" /> Spoken feedback</label>
         <label class="row">Speech rate <input type="range" name="ttsRate" min="0.6" max="2" step="0.05" /><span id="rate-val"></span></label>
         <label class="row">Language

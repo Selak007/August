@@ -48,16 +48,17 @@
 
 ## ⚡ Features
 
-1. **Zero API cost, local first** — the extension works on its own; the Python backend is optional.
-2. **Three tiers**
-   - **Tier 0** — voice input: side-panel mic (push-to-talk or **hands-free**), or the backend's Whisper push-to-talk (`Ctrl + Space`).
+1. **Zero API cost, local first** — the extension works completely standalone; the Python backend is optional.
+2. **100% Private In-Browser Whisper** — runs Whisper ONNX inside a Web Worker via WebAssembly. **Audio never leaves your browser and never touches Google's cloud servers** (unlike Chrome's built-in recognition).
+3. **Three tiers**
+   - **Tier 0** — voice input: on-device Whisper in WebAssembly, optional Chrome speech, or the Python backend (`Ctrl + Space`).
    - **Tier 1** — deterministic router (< 1 ms) with wake-word/politeness cleanup ("hey August, please open github").
    - **Tier 2** — local AI fallback: Chrome built-in Gemini Nano (Prompt API) or Ollama.
-3. **One command whitelist** — every command (router, LLM, backend) goes through `extension/schema.js` / `backend/commands/models.py` before it runs.
-4. **Click anything** — "show numbers" puts a number on every clickable element; "click 12" clicks it.
-5. **Tabs, media, zoom, keys, reading aloud** — see the command reference below or say **"help"**.
-6. **Live browser context** — active tab, title, URL and selected text ("search for this", "read this").
-7. **Persistent settings & history** — voice, speech rate, language, hands-free, wake word, AI fallback, backend connection.
+4. **One command whitelist** — every command (router, LLM, backend) goes through `extension/schema.js` / `backend/commands/models.py` before it runs.
+5. **Click anything** — "show numbers" puts a number on every clickable element; "click 12" clicks it.
+6. **Tabs, media, zoom, keys, reading aloud** — see the command reference below or say **"help"**.
+7. **Live browser context** — active tab, title, URL and selected text ("search for this", "read this").
+8. **Persistent settings & history** — select speech engine (Offline Whisper vs Cloud), voice, speech rate, language, hands-free, wake word, AI fallback.
 
 ---
 

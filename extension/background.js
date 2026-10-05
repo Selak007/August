@@ -18,6 +18,8 @@ import { validateCommand } from "./schema.js";
 // ── Settings & state ──────────────────────────────────────────────────────────
 
 export const DEFAULT_SETTINGS = {
+  sttEngine: "whisper_offline", // "whisper_offline" (on-device, private) | "web_speech" (Chrome / Google Cloud)
+  whisperModel: "Xenova/whisper-tiny.en",
   ttsEnabled: true,
   ttsRate: 1.05,
   lang: "en-US",
@@ -484,7 +486,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       sendResponse({ help: COMMAND_HELP });
       return false;
     case "AUGUST_VOICE_INPUT":
-      return reply(processVoiceInput(msg.text, { origin: msg.origin === "voice" ? "voice" : "typed" }));
+      return reply(processVoiceInput(msg.text, { origin: (msg.origin && msg.origin.startsWith("voice")) ? "voice" : "typed" }));
     case "AUGUST_SET_TTS":
       return reply(updateSettings({ ttsEnabled: !!msg.enabled }).then(() => {
         if (settings.ttsEnabled) speak("Voice feedback on");

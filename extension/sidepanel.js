@@ -7,6 +7,7 @@
  */
 
 import { COMMAND_HELP } from "./router.js";
+import { InBrowserWhisper } from "./whisper.js";
 
 const $ = id => document.getElementById(id);
 
@@ -37,6 +38,13 @@ const settingsCard   = $("card-settings");
 const settingsForm   = $("settings-form");
 const backendFooter  = $("backend-footer");
 
+const engineBadge    = $("engine-badge");
+const modelProgress  = $("model-progress");
+const progressLabel  = $("progress-label");
+const progressFill   = $("progress-fill");
+const whisperModelRow= $("whisper-model-row");
+const engineHint     = $("engine-hint");
+
 const contextCard  = $("card-context");
 const ctxTitleRow  = $("ctx-title-row");
 const ctxTitleEl   = $("ctx-title");
@@ -50,8 +58,77 @@ let wantListening = false;   // user intent (hands-free keeps restarting while t
 let isRecording = false;
 let recognition = null;
 let restartTimer = null;
+let whisper = null;
 
-// ── Speech recognition ────────────────────────────────────────────────────────
+// ── In-Browser Offline Whisper Instance ───────────────────────────────────────
+
+function getWhisperInstance() {
+  const model = lastState.settings?.whisperModel || "Xenova/whisper-tiny.en";
+  if (!whisper || whisper.modelName !== model) {
+    whisper?.destroy();
+    whisper = new InBrowserWhisper({
+      model,
+      onStatus: (status, details) => {
+        if (status === "loading") {
+          statusText.textContent = details.message || "Loading Whisper…";
+          if (modelProgress) modelProgress.style.display = "";
+          if (progressLabel) progressLabel.textContent = details.message;
+        } else if (status === "progress") {
+          const p = details.progress;
+          if (p && p.progress !== undefined && modelProgress) {
+            modelProgress.style.display = "";
+            const pct = Math.round(p.progress);
+            if (progressFill) progressFill.style.width = `${pct}%`;
+            if (progressLabel) progressLabel.textContent = `Downloading ${p.file || "model"}: ${pct}% (cached for offline use)`;
+          }
+        } else if (status === "ready") {
+          if (modelProgress) modelProgress.style.display = "none";
+          statusText.textContent = "Offline Whisper ready";
+          renderMic();
+        } else if (status === "listening") {
+          isRecording = true;
+          renderMic();
+          chrome.runtime.sendMessage({ type: "AUGUST_LISTENING", listening: true });
+        } else if (status === "transcribing") {
+          statusText.textContent = "Transcribing on-device with Whisper…";
+          renderMic();
+        }
+      },
+      onTranscript: (text, latencyMs) => {
+        isRecording = false;
+        renderMic();
+        chrome.runtime.sendMessage({ type: "AUGUST_LISTENING", listening: false });
+        if (text) {
+          interimText.textContent = "";
+          if (latencyMs && latencyBadge) latencyBadge.textContent = `${latencyMs} ms`;
+          sendCommand(text, "voice_whisper_offline");
+        }
+        if (wantListening && lastState.handsFree) {
+          clearTimeout(restartTimer);
+          restartTimer = setTimeout(startListening, 300);
+        } else {
+          wantListening = false;
+        }
+      },
+      onError: err => {
+        isRecording = false;
+        renderMic();
+        showError(`Whisper error: ${err}`);
+      },
+      onVolume: rms => {
+        if (isRecording) {
+          const scale = Math.min(1.25, 1 + rms * 2.2);
+          micBtn.style.transform = `scale(${scale.toFixed(2)})`;
+        } else {
+          micBtn.style.transform = "";
+        }
+      }
+    });
+  }
+  return whisper;
+}
+
+// ── Web Speech API Fallback ───────────────────────────────────────────────────
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -75,7 +152,6 @@ function createRecognition() {
       const text = res[0].transcript.trim();
       if (res.isFinal) {
         interimText.textContent = "";
-        // Ignore August hearing its own TTS — except "stop" to interrupt it.
         if (lastState.speaking && !/^(?:hey august,?\s*)?(?:stop|quiet|be quiet|cancel)\b/i.test(text)) continue;
         if (text) sendCommand(text, "voice");
         if (!lastState.handsFree) wantListening = false;
@@ -93,7 +169,7 @@ function createRecognition() {
       wantListening = false;
       showMicPermissionHelp();
     } else if (event.error === "network") {
-      showError("Speech recognition needs an internet connection in Chrome. Use the Python backend for offline Whisper.");
+      showError("Chrome Speech API needs internet. Switch to In-Browser Whisper in Settings for 100% offline speech.");
       wantListening = false;
     }
   };
@@ -124,7 +200,7 @@ async function ensureMicPermission() {
       showMicPermissionHelp();
       return false;
     }
-    return true; // no device info etc. — let recognition try
+    return true;
   }
 }
 
@@ -133,7 +209,6 @@ function showMicPermissionHelp() {
     <button id="grant-mic-btn" class="btn-primary" style="margin-top:6px">Grant microphone access</button>`;
   errorCard.style.display = "";
   $("grant-mic-btn")?.addEventListener("click", () => {
-    // Side panels can't show the permission prompt; a normal tab can.
     chrome.tabs.create({ url: chrome.runtime.getURL("sidepanel.html?grant=1") });
   });
 }
@@ -155,16 +230,31 @@ async function startRecognition() {
   }
 }
 
-function startListening() {
+async function startListening() {
   wantListening = true;
   errorCard.style.display = "none";
-  return startRecognition();
+  if (!(await ensureMicPermission())) return;
+
+  const engine = lastState.settings?.sttEngine || "whisper_offline";
+  if (engine === "web_speech") {
+    return startRecognition();
+  } else {
+    const w = getWhisperInstance();
+    await w.startRecording(true);
+  }
 }
 
 function stopListening() {
   wantListening = false;
   clearTimeout(restartTimer);
-  recognition?.stop();
+  const engine = lastState.settings?.sttEngine || "whisper_offline";
+  if (engine === "web_speech") {
+    recognition?.stop();
+  } else {
+    whisper?.stopRecording();
+  }
+  isRecording = false;
+  renderMic();
 }
 
 function toggleListening() {
@@ -175,14 +265,35 @@ function toggleListening() {
 micBtn.addEventListener("click", toggleListening);
 
 function renderMic() {
+  const isWhisper = (lastState.settings?.sttEngine || "whisper_offline") === "whisper_offline";
+  if (engineBadge) {
+    if (isWhisper) {
+      engineBadge.textContent = "🔒 100% Offline Whisper (Private)";
+      engineBadge.className = "engine-badge";
+    } else {
+      engineBadge.textContent = "☁ Chrome Web Speech (Google Cloud)";
+      engineBadge.className = "engine-badge cloud";
+    }
+  }
+
   micBtn.classList.toggle("recording", isRecording);
-  if (!SpeechRecognition) {
-    micLabel.textContent = "Speech API not available";
-    micBtn.disabled = true;
-  } else if (isRecording) {
-    micLabel.textContent = lastState.handsFree ? "Hands-free — listening…" : "Listening… speak now";
+  if (!isRecording) micBtn.style.transform = "";
+
+  if (isWhisper) {
+    if (isRecording) {
+      micLabel.textContent = lastState.handsFree ? "Hands-free (Whisper) — speak now…" : "Listening (Whisper) — speak now";
+    } else {
+      micLabel.textContent = lastState.handsFree ? "Click to start hands-free" : "Click mic to speak (offline)";
+    }
   } else {
-    micLabel.textContent = lastState.handsFree ? "Click to start hands-free" : "Click mic to speak";
+    if (!SpeechRecognition) {
+      micLabel.textContent = "Speech API not available";
+      micBtn.disabled = true;
+    } else if (isRecording) {
+      micLabel.textContent = lastState.handsFree ? "Hands-free — listening…" : "Listening… speak now";
+    } else {
+      micLabel.textContent = lastState.handsFree ? "Click to start hands-free" : "Click mic to speak";
+    }
   }
 }
 
@@ -247,6 +358,21 @@ $("help-close").addEventListener("click", () => toggleCard(helpCard, false));
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
+function updateEngineVisibility(engine) {
+  if (whisperModelRow) {
+    whisperModelRow.style.display = engine === "whisper_offline" ? "flex" : "none";
+  }
+  if (engineHint) {
+    engineHint.textContent = engine === "whisper_offline"
+      ? "In-Browser Whisper processes your speech entirely on your CPU with WebAssembly. No audio is ever sent to Google or anywhere else."
+      : "Chrome Web Speech streams audio to Google's cloud speech recognition service.";
+  }
+}
+
+$("stt-engine-select")?.addEventListener("change", e => {
+  updateEngineVisibility(e.target.value);
+});
+
 function fillSettings(s = {}) {
   for (const el of settingsForm.elements) {
     if (!el.name || !(el.name in s)) continue;
@@ -254,6 +380,7 @@ function fillSettings(s = {}) {
     else el.value = s[el.name];
   }
   $("rate-val").textContent = `${Number(s.ttsRate || 1).toFixed(2)}x`;
+  updateEngineVisibility(s.sttEngine || "whisper_offline");
 }
 
 function readSettings() {
@@ -271,6 +398,9 @@ function saveSettings(patch) {
       lastState.settings = resp.settings;
       lastState.handsFree = resp.settings.handsFree;
       renderMic();
+      if ((resp.settings?.sttEngine || "whisper_offline") === "whisper_offline") {
+        getWhisperInstance().preload();
+      }
     }
   });
 }
@@ -451,7 +581,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 async function boot() {
   chrome.runtime.sendMessage({ type: "AUGUST_GET_STATE" }, resp => {
-    if (resp?.state) render(resp.state);
+    if (resp?.state) {
+      render(resp.state);
+      if ((resp.state.settings?.sttEngine || "whisper_offline") === "whisper_offline") {
+        getWhisperInstance().preload();
+      }
+    }
   });
 
   const commands = await chrome.commands.getAll().catch(() => []);

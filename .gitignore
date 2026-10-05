@@ -38,3 +38,6 @@ models/
 *.bin
 *.pt
 *.gguf
+
+# Node
+node_modules/
