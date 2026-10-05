@@ -56,3 +56,18 @@ def test_websocket_rejects_invalid_token():
             pass
     assert exc_info.value.code == 1008
     assert "Invalid authentication token" in exc_info.value.reason
+
+
+def test_websocket_ping_pong_and_context():
+    """The extension's keep-alive PING gets a PONG; CONTEXT updates the browser context."""
+    from backend.context import browser_context
+
+    client = TestClient(app)
+    with client.websocket_connect("/ws", headers={"origin": "chrome-extension://abcdefg"}) as ws:
+        ws.send_json({"type": "PING", "ts": 123})
+        assert ws.receive_json() == {"type": "PONG", "ts": 123}
+        ws.send_json({"type": "CONTEXT", "context": {"url": "https://example.com/", "title": "Example", "selectedText": "hi"}})
+        ws.send_json({"type": "PING", "ts": 456})
+        assert ws.receive_json()["ts"] == 456
+    assert browser_context.current_url == "https://example.com/"
+    assert browser_context.selected_text == "hi"

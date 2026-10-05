@@ -15,19 +15,12 @@ from typing import Optional
 # ── Whitelisted actions (what the LLM may produce) ───────────────────────────
 
 ALLOWED_ACTIONS = [
-    "OPEN_URL",
-    "NEW_TAB",
-    "TAB_CLOSE",
-    "TAB_NEXT",
-    "TAB_PREVIOUS",
-    "RELOAD",
-    "GO_BACK",
-    "GO_FORWARD",
-    "SCROLL",
-    "SEARCH",
-    "CLICK",
-    "TYPE",
-    "EXTRACT_TEXT",
+    "OPEN_URL", "NEW_TAB", "NEW_WINDOW",
+    "TAB_CLOSE", "TAB_CLOSE_OTHERS", "TAB_NEXT", "TAB_PREVIOUS", "TAB_GOTO",
+    "TAB_REOPEN", "TAB_DUPLICATE", "TAB_PIN", "TAB_MUTE",
+    "RELOAD", "GO_BACK", "GO_FORWARD",
+    "SCROLL", "SEARCH", "CLICK", "TYPE", "PRESS_KEY", "EXTRACT_TEXT",
+    "MEDIA", "ZOOM", "FULLSCREEN", "HINTS",
 ]
 
 # ── System prompt ─────────────────────────────────────────────────────────────
@@ -41,7 +34,9 @@ RULES (never break these):
 3. Never invent new actions or fields not shown in the examples.
 4. If the command is impossible to map, output: {{"action": "UNKNOWN"}}
 
-SEARCH engines allowed: google, youtube, bing, duckduckgo
+SEARCH engines allowed: google, youtube, bing, duckduckgo, amazon, wikipedia, github, reddit, maps, stackoverflow
+PRESS_KEY keys: Enter, Escape, Tab, Space, Backspace, Delete, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, PageUp, PageDown, Home, End
+MEDIA ops: play, pause, toggle, forward, rewind, speed, faster, slower, restart
 
 EXAMPLES:
 User: find reinforcement learning videos on youtube

@@ -160,7 +160,7 @@ class TestModelValidation:
     def test_scroll_defaults(self):
         cmd = parse_command({"action": "SCROLL"})
         assert cmd.direction.value == "DOWN"
-        assert cmd.amount == 400
+        assert cmd.amount == 450
 
     def test_scroll_amount_capped(self):
         with pytest.raises(Exception):

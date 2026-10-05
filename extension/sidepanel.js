@@ -1,227 +1,376 @@
 /**
- * August — Standalone Side Panel Script (sidepanel.js)
+ * August — Side Panel (sidepanel.js)
  *
- * Implements:
- *   - In-browser Web Speech API (webkitSpeechRecognition)
- *   - Speech-to-text with zero external dependencies
- *   - Direct message sending to background worker
- *   - Local TTS toggle & activity history
+ *   - Web Speech API recognition: push-to-talk or hands-free (continuous)
+ *   - Shortcut-driven start/stop (messages from background.js)
+ *   - Settings, help, history, live context rendering
  */
 
-// ── DOM refs ──────────────────────────────────────────────────────────────────
+import { COMMAND_HELP } from "./router.js";
 
-const statusBadge    = document.getElementById("status-badge");
-const statusText     = document.getElementById("status-text");
-const transcriptCard = document.getElementById("card-transcript");
-const transcriptText = document.getElementById("transcript-text");
-const intentCard     = document.getElementById("card-intent");
-const intentText     = document.getElementById("intent-text");
-const errorCard      = document.getElementById("card-error");
-const errorText      = document.getElementById("error-text");
-const devInput       = document.getElementById("dev-input");
-const devSend        = document.getElementById("dev-send");
-const devResult      = document.getElementById("dev-result");
-const ttsBtn         = document.getElementById("tts-toggle-btn");
-const ttsIcon        = document.getElementById("tts-icon");
-const historyList    = document.getElementById("history-list");
-const tierBadge      = document.getElementById("tier-badge");
-const micBtn         = document.getElementById("mic-btn");
-const micLabel       = document.getElementById("mic-label");
+const $ = id => document.getElementById(id);
 
-// Context refs
-const contextCard  = document.getElementById("card-context");
-const ctxTitleRow  = document.getElementById("ctx-title-row");
-const ctxTitleEl   = document.getElementById("ctx-title");
-const ctxUrlRow    = document.getElementById("ctx-url-row");
-const ctxUrlEl     = document.getElementById("ctx-url");
-const ctxSelRow    = document.getElementById("ctx-sel-row");
-const ctxSelEl     = document.getElementById("ctx-sel");
+const statusBadge    = $("status-badge");
+const statusText     = $("status-text");
+const transcriptCard = $("card-transcript");
+const transcriptText = $("transcript-text");
+const intentCard     = $("card-intent");
+const intentText     = $("intent-text");
+const errorCard      = $("card-error");
+const errorText      = $("error-text");
+const devInput       = $("dev-input");
+const devSend        = $("dev-send");
+const devResult      = $("dev-result");
+const ttsBtn         = $("tts-toggle-btn");
+const ttsIcon        = $("tts-icon");
+const handsFreeBtn   = $("handsfree-btn");
+const helpBtn        = $("help-btn");
+const settingsBtn    = $("settings-btn");
+const historyList    = $("history-list");
+const tierBadge      = $("tier-badge");
+const latencyBadge   = $("latency-badge");
+const micBtn         = $("mic-btn");
+const micLabel       = $("mic-label");
+const interimText    = $("interim-text");
+const helpCard       = $("card-help");
+const settingsCard   = $("card-settings");
+const settingsForm   = $("settings-form");
+const backendFooter  = $("backend-footer");
 
-let currentTts = true;
+const contextCard  = $("card-context");
+const ctxTitleRow  = $("ctx-title-row");
+const ctxTitleEl   = $("ctx-title");
+const ctxUrlRow    = $("ctx-url-row");
+const ctxUrlEl     = $("ctx-url");
+const ctxSelRow    = $("ctx-sel-row");
+const ctxSelEl     = $("ctx-sel");
+
+let lastState = {};
+let wantListening = false;   // user intent (hands-free keeps restarting while true)
 let isRecording = false;
 let recognition = null;
+let restartTimer = null;
 
-// ── In-Browser Web Speech API Setup ───────────────────────────────────────────
+// ── Speech recognition ────────────────────────────────────────────────────────
 
-function initSpeechRecognition() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    micLabel.textContent = "Speech API not available";
-    micBtn.disabled = true;
-    return;
-  }
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  recognition = new SpeechRecognition();
-  recognition.continuous = false;
-  recognition.interimResults = true;
-  recognition.lang = "en-US";
+function createRecognition() {
+  const rec = new SpeechRecognition();
+  rec.continuous = !!lastState.handsFree;
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+  rec.lang = lastState.settings?.lang || "en-US";
 
-  recognition.onstart = () => {
+  rec.onstart = () => {
     isRecording = true;
-    micBtn.classList.add("recording");
-    micLabel.textContent = "Listening… (Speak now)";
-    statusText.textContent = "🎙 Listening to your voice…";
+    renderMic();
+    chrome.runtime.sendMessage({ type: "AUGUST_LISTENING", listening: true });
   };
 
-  recognition.onresult = (event) => {
-    const interimTranscript = Array.from(event.results)
-      .map(result => result[0].transcript)
-      .join("");
-
-    if (interimTranscript) {
-      transcriptText.textContent = `"${interimTranscript}"`;
-      transcriptCard.style.display = "";
+  rec.onresult = event => {
+    let interim = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const res = event.results[i];
+      const text = res[0].transcript.trim();
+      if (res.isFinal) {
+        interimText.textContent = "";
+        // Ignore August hearing its own TTS — except "stop" to interrupt it.
+        if (lastState.speaking && !/^(?:hey august,?\s*)?(?:stop|quiet|be quiet|cancel)\b/i.test(text)) continue;
+        if (text) sendCommand(text, "voice");
+        if (!lastState.handsFree) wantListening = false;
+      } else {
+        interim += text + " ";
+      }
     }
-
-    if (event.results[0].isFinal) {
-      const finalTranscript = event.results[0][0].transcript.trim();
-      console.log("[August] Final speech transcription:", finalTranscript);
-      handleVoiceCommand(finalTranscript);
-    }
+    if (interim.trim()) interimText.textContent = `"${interim.trim()}…"`;
   };
 
-  recognition.onerror = async (event) => {
+  rec.onerror = event => {
+    if (event.error === "no-speech" || event.error === "aborted") return;
     console.warn("[August] Speech recognition error:", event.error);
-    isRecording = false;
-    micBtn.classList.remove("recording");
-    micLabel.textContent = "Click Mic to Speak";
-
     if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-      errorText.innerHTML = `
-        Microphone permission needed.<br>
-        <button id="grant-mic-btn" style="margin-top:6px;background:var(--accent);color:#fff;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;font-weight:600;">
-          Grant Microphone Access
-        </button>
-      `;
-      errorCard.style.display = "";
-      document.getElementById("grant-mic-btn")?.addEventListener("click", requestMicPermission);
+      wantListening = false;
+      showMicPermissionHelp();
+    } else if (event.error === "network") {
+      showError("Speech recognition needs an internet connection in Chrome. Use the Python backend for offline Whisper.");
+      wantListening = false;
     }
   };
 
-  recognition.onend = () => {
+  rec.onend = () => {
     isRecording = false;
-    micBtn.classList.remove("recording");
-    micLabel.textContent = "Click Mic to Speak";
+    interimText.textContent = "";
+    if (wantListening && lastState.handsFree) {
+      clearTimeout(restartTimer);
+      restartTimer = setTimeout(startRecognition, 250);
+    } else {
+      wantListening = false;
+      chrome.runtime.sendMessage({ type: "AUGUST_LISTENING", listening: false });
+    }
+    renderMic();
   };
+
+  return rec;
 }
 
-async function requestMicPermission() {
+async function ensureMicPermission() {
   try {
-    // 1. Try in-panel getUserMedia
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     stream.getTracks().forEach(t => t.stop());
-    errorCard.style.display = "none";
-    statusText.textContent = "✓ Microphone permission granted!";
-    toggleRecording();
-  } catch (err) {
-    // 2. Open extension tab so Chrome shows the native address-bar prompt
-    const extUrl = chrome.runtime.getURL("sidepanel.html");
-    chrome.tabs.create({ url: extUrl });
-  }
-}
-
-async function toggleRecording() {
-  if (!recognition) initSpeechRecognition();
-  if (!recognition) return;
-
-  if (isRecording) {
-    recognition.stop();
-  } else {
-    try {
-      errorCard.style.display = "none";
-      // Ensure getUserMedia permission check
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(t => t.stop());
-      } catch (e) {
-        if (e.name === "NotAllowedError" || e.name === "PermissionDeniedError") {
-          requestMicPermission();
-          return;
-        }
-      }
-      recognition.start();
-    } catch (e) {
-      console.warn("Could not start recognition:", e);
+    return true;
+  } catch (e) {
+    if (e.name === "NotAllowedError" || e.name === "PermissionDeniedError") {
+      showMicPermissionHelp();
+      return false;
     }
+    return true; // no device info etc. — let recognition try
   }
 }
 
-micBtn.addEventListener("click", toggleRecording);
-
-// ── Voice Command Dispatcher ──────────────────────────────────────────────────
-
-function handleVoiceCommand(text) {
-  if (!text) return;
-  chrome.runtime.sendMessage({
-    type: "AUGUST_VOICE_INPUT",
-    text: text,
+function showMicPermissionHelp() {
+  errorText.innerHTML = `Microphone permission needed.<br>
+    <button id="grant-mic-btn" class="btn-primary" style="margin-top:6px">Grant microphone access</button>`;
+  errorCard.style.display = "";
+  $("grant-mic-btn")?.addEventListener("click", () => {
+    // Side panels can't show the permission prompt; a normal tab can.
+    chrome.tabs.create({ url: chrome.runtime.getURL("sidepanel.html?grant=1") });
   });
 }
 
-// ── State rendering ───────────────────────────────────────────────────────────
+function showError(message) {
+  errorText.textContent = message;
+  errorCard.style.display = "";
+}
+
+async function startRecognition() {
+  if (!SpeechRecognition) return;
+  if (isRecording) return;
+  if (!(await ensureMicPermission())) return;
+  recognition = createRecognition();
+  try {
+    recognition.start();
+  } catch (e) {
+    console.warn("[August] Could not start recognition:", e);
+  }
+}
+
+function startListening() {
+  wantListening = true;
+  errorCard.style.display = "none";
+  return startRecognition();
+}
+
+function stopListening() {
+  wantListening = false;
+  clearTimeout(restartTimer);
+  recognition?.stop();
+}
+
+function toggleListening() {
+  if (wantListening || isRecording) stopListening();
+  else startListening();
+}
+
+micBtn.addEventListener("click", toggleListening);
+
+function renderMic() {
+  micBtn.classList.toggle("recording", isRecording);
+  if (!SpeechRecognition) {
+    micLabel.textContent = "Speech API not available";
+    micBtn.disabled = true;
+  } else if (isRecording) {
+    micLabel.textContent = lastState.handsFree ? "Hands-free — listening…" : "Listening… speak now";
+  } else {
+    micLabel.textContent = lastState.handsFree ? "Click to start hands-free" : "Click mic to speak";
+  }
+}
+
+// ── Commands ──────────────────────────────────────────────────────────────────
+
+function sendCommand(text, origin = "typed") {
+  if (!text) return;
+  devResult.textContent = "…";
+  devResult.className = "dev-result";
+  chrome.runtime.sendMessage({ type: "AUGUST_VOICE_INPUT", text, origin }, resp => {
+    if (chrome.runtime.lastError || !resp) return;
+    if (resp.status === "IGNORED") {
+      devResult.textContent = resp.message ? `Ignored (${resp.message.toLowerCase()})` : "";
+      return;
+    }
+    devResult.textContent = resp.message || resp.status;
+    devResult.className = "dev-result " + (resp.status === "SUCCESS" ? "ok" : "err");
+  });
+}
+
+function sendDevCommand() {
+  const text = devInput.value.trim();
+  if (!text) return;
+  sendCommand(text, "typed");
+  devInput.value = "";
+}
+
+devSend.addEventListener("click", sendDevCommand);
+devInput.addEventListener("keydown", e => { if (e.key === "Enter") sendDevCommand(); });
+
+// ── Help ──────────────────────────────────────────────────────────────────────
+
+function renderHelp() {
+  const groups = $("help-groups");
+  groups.replaceChildren();
+  for (const { group, examples } of COMMAND_HELP) {
+    const title = document.createElement("div");
+    title.className = "help-group";
+    title.textContent = group;
+    groups.appendChild(title);
+    for (const ex of examples) {
+      const chip = document.createElement("button");
+      chip.className = "chip";
+      chip.textContent = ex;
+      chip.addEventListener("click", () => {
+        devInput.value = ex.replace(/\s*\(.*\)$/, "");
+        devInput.focus();
+      });
+      groups.appendChild(chip);
+    }
+  }
+}
+
+function toggleCard(card, show) {
+  const visible = show ?? card.style.display === "none";
+  card.style.display = visible ? "" : "none";
+  return visible;
+}
+
+helpBtn.addEventListener("click", () => toggleCard(helpCard) && renderHelp());
+$("help-close").addEventListener("click", () => toggleCard(helpCard, false));
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+
+function fillSettings(s = {}) {
+  for (const el of settingsForm.elements) {
+    if (!el.name || !(el.name in s)) continue;
+    if (el.type === "checkbox") el.checked = !!s[el.name];
+    else el.value = s[el.name];
+  }
+  $("rate-val").textContent = `${Number(s.ttsRate || 1).toFixed(2)}x`;
+}
+
+function readSettings() {
+  const out = {};
+  for (const el of settingsForm.elements) {
+    if (!el.name) continue;
+    out[el.name] = el.type === "checkbox" ? el.checked : el.value;
+  }
+  return out;
+}
+
+function saveSettings(patch) {
+  chrome.runtime.sendMessage({ type: "AUGUST_SET_SETTINGS", settings: patch }, resp => {
+    if (resp?.ok) {
+      lastState.settings = resp.settings;
+      lastState.handsFree = resp.settings.handsFree;
+      renderMic();
+    }
+  });
+}
+
+settingsBtn.addEventListener("click", () => {
+  if (toggleCard(settingsCard)) fillSettings(lastState.settings);
+});
+$("settings-close").addEventListener("click", () => toggleCard(settingsCard, false));
+settingsForm.ttsRate.addEventListener("input", e => { $("rate-val").textContent = `${Number(e.target.value).toFixed(2)}x`; });
+settingsForm.addEventListener("submit", e => {
+  e.preventDefault();
+  const patch = readSettings();
+  const handsFreeChanged = patch.handsFree !== lastState.handsFree;
+  saveSettings(patch);
+  if (handsFreeChanged && isRecording) stopListening();
+  devResult.textContent = "Settings saved";
+  devResult.className = "dev-result ok";
+});
+$("clear-history").addEventListener("click", () => chrome.runtime.sendMessage({ type: "AUGUST_CLEAR_HISTORY" }));
+$("edit-shortcuts").addEventListener("click", () => chrome.tabs.create({ url: "chrome://extensions/shortcuts" }));
+
+handsFreeBtn.addEventListener("click", () => {
+  const next = !lastState.handsFree;
+  lastState.handsFree = next;
+  saveSettings({ handsFree: next });
+  if (next) startListening();
+  else stopListening();
+  renderHeader();
+});
+
+ttsBtn.addEventListener("click", () => {
+  chrome.runtime.sendMessage({ type: "AUGUST_SET_TTS", enabled: !lastState.ttsEnabled }, resp => {
+    if (resp?.ok) { lastState.ttsEnabled = resp.ttsEnabled; renderHeader(); }
+  });
+});
+
+// ── Rendering ─────────────────────────────────────────────────────────────────
+
+const BACKEND_BADGE = {
+  connected:  ["● Backend connected", "badge-ok", "backend connected"],
+  connecting: ["◌ Connecting…", "badge-warn", "connecting to backend"],
+  offline:    ["○ Backend offline", "badge-err", "backend offline — standalone"],
+  off:        ["● Standalone", "badge-ok", "standalone"],
+};
+
+function renderHeader() {
+  const [label, cls, footer] = BACKEND_BADGE[lastState.backend] || BACKEND_BADGE.off;
+  statusBadge.textContent = label;
+  statusBadge.className = `badge ${cls}`;
+  backendFooter.textContent = footer;
+
+  const tts = lastState.ttsEnabled !== false;
+  ttsIcon.textContent = tts ? "🔊" : "🔇";
+  ttsBtn.className = "icon-btn " + (tts ? "tts-on" : "tts-off");
+  ttsBtn.title = tts ? "Voice feedback ON (click to mute)" : "Voice feedback OFF (click to enable)";
+
+  handsFreeBtn.classList.toggle("active", !!lastState.handsFree);
+  handsFreeBtn.title = lastState.handsFree ? "Hands-free ON — keeps listening" : "Hands-free OFF — click to keep listening";
+}
+
+const TIER_LABEL = {
+  deterministic: ["TIER 1 · INSTANT", "sub-label tier-1"],
+  llm:           ["TIER 2 · LOCAL AI", "sub-label tier-2"],
+  gemini_nano:   ["TIER 2 · GEMINI NANO", "sub-label tier-2"],
+  ollama:        ["TIER 2 · OLLAMA", "sub-label tier-2"],
+};
 
 function render(state) {
-  // Status
-  statusText.textContent = state.status || "Ready (Standalone Local Mode)";
-
-  // Tier indicator
-  if (state.intent) {
-    if (state.status?.includes("⚡")) {
-      tierBadge.textContent = "TIER 1 · INSTANT DETERMINISTIC";
-      tierBadge.className = "sub-label tier-1";
-    } else if (state.status?.includes("🤖")) {
-      tierBadge.textContent = "TIER 2 · LOCAL AI FALLBACK";
-      tierBadge.className = "sub-label tier-2";
-    } else {
-      tierBadge.textContent = "ACTIVE";
-      tierBadge.className = "sub-label";
-    }
-  } else {
-    tierBadge.textContent = "STANDALONE READY";
-    tierBadge.className = "sub-label";
+  const handsFreeWas = lastState.handsFree;
+  lastState = state;
+  renderHeader();
+  renderMic();
+  if (handsFreeWas !== undefined && handsFreeWas !== state.handsFree && isRecording) {
+    stopListening();
   }
 
-  // TTS Toggle button
-  currentTts = state.ttsEnabled !== false;
-  ttsIcon.textContent = currentTts ? "🔊" : "🔇";
-  ttsBtn.className = "icon-btn " + (currentTts ? "tts-on" : "tts-off");
-  ttsBtn.title = currentTts ? "Voice feedback ON (click to mute)" : "Voice feedback MUTED (click to enable)";
+  statusText.textContent = state.status || "Ready";
+  const [tierLabel, tierCls] = TIER_LABEL[state.tier] ||
+    (state.tier?.startsWith("backend") ? ["PYTHON BACKEND", "sub-label tier-2"] : [state.listening ? "LISTENING" : "READY", "sub-label"]);
+  tierBadge.textContent = tierLabel;
+  tierBadge.className = tierCls;
 
-  // Transcript
-  if (state.transcript) {
-    transcriptText.textContent = `"${state.transcript}"`;
-    transcriptCard.style.display = "";
-  } else {
-    transcriptCard.style.display = "none";
-  }
+  transcriptCard.style.display = state.transcript ? "" : "none";
+  transcriptText.textContent = state.transcript ? `"${state.transcript}"` : "";
 
-  // Intent / action
-  if (state.intent) {
-    intentText.textContent = state.intent;
-    intentCard.style.display = "";
-  } else {
-    intentCard.style.display = "none";
-  }
+  intentCard.style.display = state.intent ? "" : "none";
+  intentText.textContent = state.intent || "";
 
-  // Error
   if (state.lastError) {
-    errorText.textContent = state.lastError;
-    errorCard.style.display = "";
-  } else {
+    if (!$("grant-mic-btn")) showError(state.lastError);
+  } else if (!$("grant-mic-btn")) {
     errorCard.style.display = "none";
   }
 
-  // Browser context
   const hasTitle = !!state.pageTitle;
   const hasUrl   = !!state.currentUrl;
   const hasSel   = !!state.selectedText;
-  const hasCtx   = hasTitle || hasUrl || hasSel;
-
-  contextCard.style.display = hasCtx ? "" : "none";
-
+  contextCard.style.display = hasTitle || hasUrl || hasSel ? "" : "none";
   ctxTitleRow.style.display = hasTitle ? "flex" : "none";
-  if (hasTitle) ctxTitleEl.textContent = state.pageTitle;
-
+  ctxTitleEl.textContent = state.pageTitle || "";
   ctxUrlRow.style.display = hasUrl ? "flex" : "none";
   if (hasUrl) {
     try {
@@ -229,87 +378,103 @@ function render(state) {
       ctxUrlEl.textContent = u.hostname + (u.pathname !== "/" ? u.pathname.slice(0, 30) : "");
     } catch { ctxUrlEl.textContent = state.currentUrl.slice(0, 50); }
   }
-
   ctxSelRow.style.display = hasSel ? "flex" : "none";
-  if (hasSel) ctxSelEl.textContent = `"${state.selectedText.slice(0, 60)}…"`;
+  ctxSelEl.textContent = hasSel ? `"${state.selectedText.slice(0, 60)}${state.selectedText.length > 60 ? "…" : ""}"` : "";
 
-  // History List
   renderHistory(state.history || []);
 }
 
 function renderHistory(items) {
-  if (!items || items.length === 0) {
-    historyList.innerHTML = '<div class="history-empty">Click the mic or type a command to get started.</div>';
+  historyList.replaceChildren();
+  const latest = items.find(i => i.latencyMs !== undefined);
+  latencyBadge.textContent = latest ? `${latest.latencyMs} ms` : "";
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "history-empty";
+    empty.textContent = 'Click the mic or type a command. Say "help" to see examples.';
+    historyList.appendChild(empty);
+    return;
+  }
+  for (const item of items.slice(0, 10)) {
+    const ok = item.status === "SUCCESS";
+    const row = document.createElement("div");
+    row.className = `history-item ${ok ? "hist-ok" : "hist-err"}`;
+    row.innerHTML = `<div class="hist-row"><span class="hist-action"></span><span class="hist-time"></span></div><div class="hist-msg"></div>`;
+    row.querySelector(".hist-action").textContent = item.action;
+    if (item.tier) {
+      const tier = document.createElement("span");
+      tier.className = "hist-tier";
+      tier.textContent = item.tier;
+      row.querySelector(".hist-action").appendChild(tier);
+    }
+    row.querySelector(".hist-time").textContent = item.time;
+    row.querySelector(".hist-msg").textContent = `${ok ? "✓" : "✗"} ${item.message || ""}`;
+    historyList.appendChild(row);
+  }
+}
+
+// ── Messages from background ──────────────────────────────────────────────────
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (sender.id !== chrome.runtime.id) return false;
+  switch (msg.type) {
+    case "AUGUST_STATE":
+      if (msg.state) render(msg.state);
+      return false;
+    case "AUGUST_START_LISTENING":
+      startListening();
+      sendResponse({ ok: true });
+      return false;
+    case "AUGUST_TOGGLE_LISTENING":
+      toggleListening();
+      sendResponse({ ok: true });
+      return false;
+    case "AUGUST_STOP_LISTENING":
+      stopListening();
+      sendResponse({ ok: true });
+      return false;
+    case "AUGUST_SHOW_HELP":
+      toggleCard(helpCard, true);
+      renderHelp();
+      helpCard.scrollIntoView({ behavior: "smooth" });
+      return false;
+    case "AUGUST_NOTICE":
+      devResult.textContent = msg.message;
+      devResult.className = "dev-result";
+      return false;
+    default:
+      return false;
+  }
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+
+async function boot() {
+  chrome.runtime.sendMessage({ type: "AUGUST_GET_STATE" }, resp => {
+    if (resp?.state) render(resp.state);
+  });
+
+  const commands = await chrome.commands.getAll().catch(() => []);
+  const shortcut = commands.find(c => c.name === "open_side_panel")?.shortcut;
+  if (shortcut) $("shortcut-kbd").textContent = shortcut;
+
+  if (new URLSearchParams(location.search).has("grant")) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+      statusText.textContent = "✓ Microphone allowed — you can close this tab and use the side panel.";
+    } catch {
+      showError("Microphone access was blocked. Allow it from the address bar's site settings.");
+    }
     return;
   }
 
-  historyList.innerHTML = items.slice(0, 8).map(item => {
-    const isOk = item.status === "SUCCESS";
-    const statusIcon = isOk ? "✓" : "✗";
-    const statusClass = isOk ? "hist-ok" : "hist-err";
-    const targetText = item.target ? `<span class="hist-target">${escapeHtml(item.target)}</span>` : "";
-    return `
-      <div class="history-item ${statusClass}">
-        <div class="hist-row">
-          <span class="hist-action">${item.action}</span>
-          <span class="hist-time">${item.time}</span>
-        </div>
-        <div class="hist-msg">${statusIcon} ${escapeHtml(item.message || "")} ${targetText}</div>
-      </div>
-    `;
-  }).join("");
-}
-
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-// ── Polling & Live Updates ────────────────────────────────────────────────────
-
-function poll() {
-  chrome.runtime.sendMessage({ type: "AUGUST_GET_STATE" }, (resp) => {
-    if (chrome.runtime.lastError) return;
-    if (resp?.state) render(resp.state);
-  });
-}
-
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === "AUGUST_STATE" && msg.state) {
-    render(msg.state);
+  const { pendingListen } = await chrome.storage.session.get("pendingListen").catch(() => ({}));
+  if (pendingListen) {
+    await chrome.storage.session.set({ pendingListen: false });
+    startListening();
   }
-});
-
-poll();
-setInterval(poll, 2000);
-initSpeechRecognition();
-
-// ── TTS Toggle ────────────────────────────────────────────────────────────────
-
-ttsBtn.addEventListener("click", () => {
-  const next = !currentTts;
-  chrome.runtime.sendMessage({ type: "AUGUST_SET_TTS", enabled: next }, (resp) => {
-    if (resp?.ok) {
-      currentTts = resp.ttsEnabled;
-      ttsIcon.textContent = currentTts ? "🔊" : "🔇";
-      ttsBtn.className = "icon-btn " + (currentTts ? "tts-on" : "tts-off");
-    }
-  });
-});
-
-// ── Dev Quick Runner ──────────────────────────────────────────────────────────
-
-function sendDevCommand() {
-  const text = devInput.value.trim();
-  if (!text) return;
-  handleVoiceCommand(text);
-  devInput.value = "";
 }
 
-devSend.addEventListener("click", sendDevCommand);
-devInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") sendDevCommand();
-});
+renderMic();
+boot();

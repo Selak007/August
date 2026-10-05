@@ -1,106 +1,140 @@
 /**
- * August Extension — In-Browser Local LLM Fallback (llm.js)
+ * August Extension — Local LLM Fallback (llm.js)
  *
- * Tier 2 Intelligence:
- *   1. Tries Chrome Built-in AI (Gemini Nano via window.ai) if available.
- *   2. Or queries local Ollama (http://127.0.0.1:11434) directly from browser.
+ * Tier 2 intelligence, only used when the deterministic router has no match:
+ *   1. Chrome Built-in AI (Gemini Nano, Prompt API) when available.
+ *   2. Local Ollama (http://127.0.0.1:11434) when running.
  *
- * Runs 100% client-side with zero Python requirement.
+ * Output is always passed through validateCommand() before execution.
  */
 
-const ALLOWED_ACTIONS = [
-  "OPEN_URL", "NEW_TAB", "TAB_CLOSE", "TAB_NEXT", "TAB_PREVIOUS",
-  "RELOAD", "GO_BACK", "GO_FORWARD", "SCROLL", "SEARCH", "CLICK", "TYPE", "EXTRACT_TEXT"
-];
+import { ALLOWED_ACTIONS, SEARCH_ENGINES, KEYS, MEDIA_OPS, validateCommand } from "./schema.js";
+
+const LLM_ACTIONS = ALLOWED_ACTIONS.filter(a => a !== "STOP");
+
+export const DEFAULT_LLM_SETTINGS = {
+  llmEnabled: true,
+  ollamaUrl: "http://127.0.0.1:11434",
+  ollamaModel: "llama3.2:1b",
+};
 
 const SYSTEM_PROMPT = `You are August, a Chrome browser voice agent.
 Convert the user's voice command into a single JSON object.
 RULES:
 1. Output ONLY a single valid JSON object. No explanation, no markdown.
-2. Allowed actions: ${ALLOWED_ACTIONS.join(", ")}.
-3. Allowed search engines: google, youtube, bing, duckduckgo.
-4. If unknown: {"action": "UNKNOWN"}
+2. Allowed actions: ${LLM_ACTIONS.join(", ")}.
+3. Allowed search engines: ${SEARCH_ENGINES.join(", ")}.
+4. PRESS_KEY keys: ${KEYS.join(", ")}. MEDIA ops: ${MEDIA_OPS.join(", ")}.
+5. Use the selected text from Context when the user says "this", "it" or "that".
+6. If the command is not a browser action: {"action": "UNKNOWN"}
 
 Examples:
 "find jazz videos on youtube" -> {"action": "SEARCH", "engine": "youtube", "query": "jazz videos"}
-"open chatgpt" -> {"action": "OPEN_URL", "url": "https://chat.openai.com"}
-"scroll down" -> {"action": "SCROLL", "direction": "DOWN", "amount": 600}
+"open chatgpt" -> {"action": "OPEN_URL", "url": "https://chatgpt.com"}
+"scroll down" -> {"action": "SCROLL", "direction": "DOWN", "amount": 450}
 "click the first video" -> {"action": "CLICK", "target": "first_video"}
-"type hello into search" -> {"action": "TYPE", "text": "hello", "target": "search_input"}`;
+"type hello into search" -> {"action": "TYPE", "text": "hello", "target": "search_input"}
+"go to my second tab" -> {"action": "TAB_GOTO", "index": 2}
+"jump ahead half a minute" -> {"action": "MEDIA", "op": "forward", "seconds": 30}
+"make the text bigger" -> {"action": "ZOOM", "direction": "IN"}
+"translate this" (selected: "bonjour") -> {"action": "SEARCH", "engine": "google", "query": "translate bonjour"}`;
 
-export async function queryLocalLLM(text, context = {}) {
-  const t0 = performance.now();
-
-  let contextSnippet = "";
-  if (context.title || context.url) {
-    contextSnippet = `\nContext: Page "${context.title || ''}" (${context.url || ''})`;
-  }
-
-  // 1. Try Chrome Built-in AI (Gemini Nano)
-  if (typeof window !== "undefined" && window.ai?.languageModel) {
-    try {
-      const session = await window.ai.languageModel.create({
-        systemPrompt: SYSTEM_PROMPT,
-      });
-      const raw = await session.prompt(`Command: "${text}"${contextSnippet}\nJSON:`);
-      session.destroy();
-      const command = parseLLMResponse(raw);
-      if (command) {
-        return {
-          command,
-          tier: "gemini_nano",
-          latencyMs: Math.round(performance.now() - t0),
-        };
-      }
-    } catch (e) {
-      console.warn("[August] Built-in AI error:", e);
-    }
-  }
-
-  // 2. Fallback: Direct Local Ollama HTTP fetch (if running locally)
-  try {
-    const res = await fetch("http://127.0.0.1:11434/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "llama3.2:1b",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: `Command: "${text}"${contextSnippet}\nJSON:` }
-        ],
-        stream: false,
-        options: { temperature: 0.0 }
-      })
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      const content = data.message?.content || "";
-      const command = parseLLMResponse(content);
-      if (command) {
-        return {
-          command,
-          tier: "ollama",
-          latencyMs: Math.round(performance.now() - t0),
-        };
-      }
-    }
-  } catch (e) {
-    // Ollama not running — that's fine, Tier 1 handled most
-  }
-
-  return { command: null, tier: "none", latencyMs: Math.round(performance.now() - t0) };
+function buildPrompt(text, context) {
+  const lines = [`Command: "${text}"`];
+  if (context.title || context.url) lines.push(`Context: page "${context.title || ""}" (${context.url || ""})`);
+  if (context.selectedText) lines.push(`Selected text: "${context.selectedText.slice(0, 300)}"`);
+  lines.push("JSON:");
+  return lines.join("\n");
 }
 
-function parseLLMResponse(raw) {
+/** Prompt API: `LanguageModel` (Chrome 138+) or legacy `ai.languageModel`. */
+function getBuiltInModel() {
+  const g = globalThis;
+  if (g.LanguageModel?.create) return g.LanguageModel;
+  if (g.ai?.languageModel?.create) return g.ai.languageModel;
+  return null;
+}
+
+async function queryBuiltIn(prompt) {
+  const model = getBuiltInModel();
+  if (!model) return null;
+  const availability = await (model.availability?.() ?? model.capabilities?.().then(c => c.available));
+  if (availability && !["available", "readily"].includes(availability)) return null;
+
+  const session = await model.create({
+    initialPrompts: [{ role: "system", content: SYSTEM_PROMPT }],
+    systemPrompt: SYSTEM_PROMPT,
+    temperature: 0,
+    topK: 1,
+  });
   try {
-    const cleaned = raw.replace(/```(?:json)?/g, "").replace(/```/g, "").trim();
+    return await session.prompt(prompt);
+  } finally {
+    session.destroy?.();
+  }
+}
+
+async function queryOllama(prompt, settings) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(`${settings.ollamaUrl.replace(/\/$/, "")}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: settings.ollamaModel,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: prompt },
+        ],
+        format: "json",
+        stream: false,
+        options: { temperature: 0.0 },
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.message?.content || "";
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function queryLocalLLM(text, context = {}, settings = DEFAULT_LLM_SETTINGS) {
+  const t0 = performance.now();
+  const done = (command, tier) => ({ command, tier, latencyMs: Math.round(performance.now() - t0) });
+  if (!settings.llmEnabled) return done(null, "disabled");
+
+  const prompt = buildPrompt(text, context);
+
+  try {
+    const command = parseLLMResponse(await queryBuiltIn(prompt));
+    if (command) return done(command, "gemini_nano");
+  } catch (e) {
+    console.warn("[August] Built-in AI error:", e);
+  }
+
+  try {
+    const command = parseLLMResponse(await queryOllama(prompt, { ...DEFAULT_LLM_SETTINGS, ...settings }));
+    if (command) return done(command, "ollama");
+  } catch {
+    // Ollama not running — fine, Tier 1 handles most commands.
+  }
+
+  return done(null, "none");
+}
+
+export function parseLLMResponse(raw) {
+  if (!raw) return null;
+  try {
+    const cleaned = raw.replace(/```(?:json)?/g, "").trim();
     const match = cleaned.match(/\{[\s\S]*\}/);
     if (!match) return null;
     const json = JSON.parse(match[0]);
-    if (json.action && ALLOWED_ACTIONS.includes(json.action)) {
-      return json;
-    }
-  } catch {}
-  return null;
+    if (!LLM_ACTIONS.includes(json.action)) return null;
+    return validateCommand(json);
+  } catch {
+    return null;
+  }
 }
