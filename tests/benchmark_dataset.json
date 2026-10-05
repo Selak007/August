@@ -101,7 +101,7 @@
   {"utterance": "what is on this page", "expected_action": "EXTRACT_TEXT", "expected_tier": "deterministic", "category": "dom_interaction"},
 
   {"utterance": "find something interesting about reinforcement learning and open it", "expected_action": "SEARCH", "expected_tier": "llm_fallback", "category": "complex_llm"},
-  {"utterance": "look up some good dinner recipes nearby", "expected_action": "SEARCH", "expected_tier": "llm_fallback", "category": "complex_llm"},
+  {"utterance": "look up some good dinner recipes nearby", "expected_action": "SEARCH", "expected_tier": "deterministic", "category": "complex_llm"},
   {"utterance": "I want to listen to some chill relaxing music", "expected_action": "SEARCH", "expected_tier": "llm_fallback", "category": "complex_llm"},
   {"utterance": "take me to microsoft official website", "expected_action": "OPEN_URL", "expected_tier": "llm_fallback", "category": "complex_llm"},
   {"utterance": "can you find the latest stock prices for Apple", "expected_action": "SEARCH", "expected_tier": "llm_fallback", "category": "complex_llm"},

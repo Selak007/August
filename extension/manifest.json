@@ -1,9 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "August — Voice Browser Agent",
-  "version": "1.0.0",
-  "description": "Completely local, private, voice-controlled Chrome assistant. Zero API cost, no backend needed.",
-
+  "name": "August \u2014 Voice Browser Agent",
+  "version": "1.1.0",
+  "description": "Local, private, voice-controlled Chrome assistant. Works standalone; optional Python backend for Whisper push-to-talk.",
   "permissions": [
     "tabs",
     "activeTab",
@@ -11,53 +10,66 @@
     "windows",
     "storage",
     "sidePanel",
-    "tts"
+    "tts",
+    "sessions",
+    "alarms"
   ],
-
   "host_permissions": [
     "<all_urls>"
   ],
-
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
-
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
-
   "side_panel": {
     "default_path": "sidepanel.html"
   },
-
   "action": {
     "default_popup": "popup.html",
     "default_title": "August Voice Agent",
     "default_icon": {
-      "16":  "icons/icon16.png",
-      "48":  "icons/icon48.png",
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
   },
-
   "commands": {
+    "_execute_action": {
+      "description": "Open the August popup"
+    },
     "open_side_panel": {
       "suggested_key": {
         "default": "Ctrl+Shift+Space",
         "mac": "Command+Shift+Space"
       },
-      "description": "Open August Voice Assistant Side Panel"
+      "description": "Open August and start listening"
+    },
+    "toggle_listening": {
+      "suggested_key": {
+        "default": "Alt+Shift+A",
+        "mac": "Alt+Shift+A"
+      },
+      "description": "Start / stop listening (side panel must be open)"
+    },
+    "stop_speaking": {
+      "description": "Stop August speaking"
     }
   },
-
   "icons": {
-    "16":  "icons/icon16.png",
-    "48":  "icons/icon48.png",
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "minimum_chrome_version": "116"
 }

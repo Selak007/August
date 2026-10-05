@@ -1,0 +1,9 @@
+# August — optional voice-input dependencies (push-to-talk + Whisper)
+# Requires the PortAudio system library (macOS: brew install portaudio,
+# Debian/Ubuntu: sudo apt install libportaudio2).
+-r requirements.txt
+faster-whisper>=1.0.0
+sounddevice>=0.4.6
+numpy>=1.26.0
+pynput>=1.7.6
+keyboard>=0.13.5

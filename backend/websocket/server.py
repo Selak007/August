@@ -16,8 +16,7 @@ from typing import Optional
 
 from fastapi import WebSocket, WebSocketDisconnect, status
 
-from backend.commands.models import parse_command, ResultEnvelope
-from backend.commands.router import route
+from backend.commands.models import command_to_wire, parse_command, ResultEnvelope
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +126,7 @@ class ExtensionBridge:
 
         envelope = {
             "id": cmd_id,
-            "command": cmd.model_dump(),
+            "command": command_to_wire(cmd),
             "source": source,
         }
 
@@ -137,7 +136,7 @@ class ExtensionBridge:
         self._pending[cmd_id] = fut
 
         t0 = time.perf_counter()
-        logger.info("[WS] Sending  id=%s  command=%s", cmd_id[:8], cmd.model_dump())
+        logger.info("[WS] Sending  id=%s  command=%s", cmd_id[:8], envelope["command"])
 
         try:
             await self._ws.send_text(json.dumps(envelope))
@@ -180,6 +179,16 @@ class ExtensionBridge:
             data = json.loads(raw)
         except json.JSONDecodeError:
             logger.warning("[WS] Received non-JSON message: %r", raw[:200])
+            return
+
+        # ── Keep-alive from the extension service worker ─────────────────────
+        if data.get("type") == "PING":
+            ws = self._ws
+            if ws is not None:
+                try:
+                    await ws.send_text(json.dumps({"type": "PONG", "ts": data.get("ts")}))
+                except Exception:
+                    pass
             return
 
         # ── Browser context update (no correlation id needed) ─────────────────

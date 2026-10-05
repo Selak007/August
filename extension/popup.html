@@ -5,7 +5,7 @@
   <title>August</title>
   <link rel="stylesheet" href="styles.css" />
   <style>
-    body { min-width: 240px; }
+    body { min-width: 260px; }
     .panel { min-height: unset; padding-bottom: 12px; }
     .open-panel-btn {
       display: block;
@@ -22,6 +22,7 @@
       transition: opacity 0.15s;
     }
     .open-panel-btn:hover { opacity: 0.85; }
+    .popup-cmd { margin: 10px 12px 0; }
   </style>
 </head>
 <body>
@@ -34,7 +35,10 @@
       <div class="label">STATUS</div>
       <div class="value" id="status">Checking…</div>
     </section>
-    <button class="open-panel-btn" id="open-panel">Open Side Panel</button>
+    <div class="dev-row popup-cmd">
+      <input type="text" id="cmd" class="dev-input" placeholder="Type a command, press Enter" />
+    </div>
+    <button class="open-panel-btn" id="open-panel">Open Side Panel &amp; Listen</button>
   </div>
   <script src="popup.js"></script>
 </body>

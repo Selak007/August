@@ -1,0 +1,11 @@
+{
+  "name": "august",
+  "private": true,
+  "type": "module",
+  "description": "Dev tooling for the August Chrome extension (no runtime dependencies).",
+  "scripts": {
+    "test": "node --test tests/js/*.test.js",
+    "check": "for f in extension/*.js; do node --check \"$f\" || exit 1; done"
+  },
+  "engines": { "node": ">=20" }
+}

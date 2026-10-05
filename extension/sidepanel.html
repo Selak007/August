@@ -16,6 +16,15 @@
         <span class="badge badge-ok" id="status-badge">● Standalone Ready</span>
       </div>
       <div class="header-right">
+        <button id="handsfree-btn" class="icon-btn" title="Hands-free mode (keep listening)">
+          <span>♾</span>
+        </button>
+        <button id="help-btn" class="icon-btn" title="What can I say?">
+          <span>?</span>
+        </button>
+        <button id="settings-btn" class="icon-btn" title="Settings">
+          <span>⚙</span>
+        </button>
         <button id="tts-toggle-btn" class="icon-btn tts-on" title="Toggle Voice Feedback (TTS)">
           <span id="tts-icon">🔊</span>
         </button>
@@ -30,8 +39,58 @@
       </button>
       <div class="mic-hero-text">
         <div class="mic-hero-title" id="mic-label">Click Mic to Speak</div>
-        <div class="mic-hero-sub">Or use shortcut: <kbd>Ctrl+Shift+Space</kbd></div>
+        <div class="mic-hero-sub" id="mic-sub">Shortcut: <kbd id="shortcut-kbd">Ctrl+Shift+Space</kbd> · say <em>"help"</em></div>
+        <div class="interim" id="interim-text"></div>
       </div>
+    </section>
+
+    <!-- Help -->
+    <section class="card help-card" id="card-help" style="display:none">
+      <div class="card-header-row">
+        <div class="label">WHAT YOU CAN SAY</div>
+        <button class="link-btn" id="help-close">close</button>
+      </div>
+      <div id="help-groups"></div>
+      <div class="hint-text">Tap an example to put it in the command box. Prefix "hey August" is optional.</div>
+    </section>
+
+    <!-- Settings -->
+    <section class="card settings-card" id="card-settings" style="display:none">
+      <div class="card-header-row">
+        <div class="label">SETTINGS</div>
+        <button class="link-btn" id="settings-close">close</button>
+      </div>
+      <form id="settings-form" class="settings-form">
+        <div class="settings-group">Voice</div>
+        <label class="row"><input type="checkbox" name="ttsEnabled" /> Spoken feedback</label>
+        <label class="row">Speech rate <input type="range" name="ttsRate" min="0.6" max="2" step="0.05" /><span id="rate-val"></span></label>
+        <label class="row">Language
+          <select name="lang">
+            <option value="en-US">English (US)</option>
+            <option value="en-GB">English (UK)</option>
+            <option value="en-IN">English (India)</option>
+            <option value="en-AU">English (Australia)</option>
+          </select>
+        </label>
+        <label class="row"><input type="checkbox" name="handsFree" /> Hands-free (keep listening)</label>
+        <label class="row"><input type="checkbox" name="requireWakeWord" /> In hands-free, only act on "August …"</label>
+
+        <div class="settings-group">Local AI fallback</div>
+        <label class="row"><input type="checkbox" name="llmEnabled" /> Use Gemini Nano / Ollama for unknown commands</label>
+        <label class="row col">Ollama URL <input type="text" name="ollamaUrl" class="dev-input" /></label>
+        <label class="row col">Ollama model <input type="text" name="ollamaModel" class="dev-input" /></label>
+
+        <div class="settings-group">Python backend (Whisper push-to-talk)</div>
+        <label class="row"><input type="checkbox" name="backendEnabled" /> Connect to local backend</label>
+        <label class="row col">WebSocket URL <input type="text" name="backendUrl" class="dev-input" /></label>
+        <label class="row col">Auth token <input type="password" name="backendToken" class="dev-input" autocomplete="off" /></label>
+
+        <div class="settings-actions">
+          <button type="submit" class="btn-primary">Save</button>
+          <button type="button" class="link-btn" id="clear-history">Clear history</button>
+          <button type="button" class="link-btn" id="edit-shortcuts">Keyboard shortcuts</button>
+        </div>
+      </form>
     </section>
 
     <!-- Status row -->
@@ -83,7 +142,7 @@
       <div class="label">TYPE OR RUN COMMAND</div>
       <div class="dev-row">
         <input type="text" id="dev-input" class="dev-input"
-               placeholder='e.g. open smart, scroll down' />
+               placeholder='e.g. open youtube, tab 2, show numbers' />
         <button id="dev-send" class="btn-send" title="Execute">▶</button>
       </div>
       <div class="dev-result" id="dev-result"></div>
@@ -91,7 +150,10 @@
 
     <!-- Activity History -->
     <section class="card history-card" id="card-history">
-      <div class="label">RECENT ACTIVITY</div>
+      <div class="card-header-row">
+        <div class="label">RECENT ACTIVITY</div>
+        <div class="sub-label" id="latency-badge"></div>
+      </div>
       <div class="history-list" id="history-list">
         <div class="history-empty">Click the mic or type a command to get started.</div>
       </div>
@@ -99,10 +161,10 @@
 
     <!-- Footer -->
     <footer class="panel-footer">
-      <span>August 1.0 · 100% Local & Free Chrome Extension</span>
+      <span>August 1.1 · Local &amp; private · <span id="backend-footer">standalone</span></span>
     </footer>
   </div>
 
-  <script src="sidepanel.js"></script>
+  <script type="module" src="sidepanel.js"></script>
 </body>
 </html>

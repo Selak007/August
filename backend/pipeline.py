@@ -20,13 +20,15 @@ import asyncio
 import logging
 import threading
 import time
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
-from backend.audio.recorder import PushToTalkRecorder
 from backend.commands.router import route
 from backend.commands.llm_fallback import llm_fallback
 from backend.config import config
 from backend.websocket.server import ExtensionBridge
+
+if TYPE_CHECKING:
+    from backend.audio.recorder import PushToTalkRecorder
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +51,7 @@ class VoicePipeline:
     def __init__(self, bridge: ExtensionBridge) -> None:
         self._bridge     = bridge
         self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._recorder: Optional[PushToTalkRecorder]   = None
+        self._recorder: Optional["PushToTalkRecorder"] = None
         self._thread: Optional[threading.Thread]        = None
         self._started    = False
 
@@ -73,7 +75,8 @@ class VoicePipeline:
         self._notify_extension("routing", f'"{text}"', transcript=text)
 
         # ── Tier 1: Deterministic ─────────────────────────────────────────────
-        router_result = route(text)
+        from backend.context import browser_context
+        router_result = route(text, {"selectedText": browser_context.selected_text})
 
         if router_result.command is not None:
             logger.info(
@@ -230,6 +233,17 @@ class VoicePipeline:
             return
 
         self._loop = asyncio.get_event_loop()
+
+        # Audio deps (sounddevice/PortAudio, faster-whisper, keyboard hooks) are
+        # optional: without them the backend still serves /ws and /command/*.
+        try:
+            from backend.audio.recorder import PushToTalkRecorder
+        except (ImportError, OSError) as exc:
+            logger.warning(
+                "[PIPELINE] Voice input disabled (%s). Bridge + REST endpoints still work. "
+                "Install requirements-audio.txt and PortAudio to enable push-to-talk.", exc,
+            )
+            return
 
         self._recorder = PushToTalkRecorder(
             on_result    = self._on_result,

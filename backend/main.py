@@ -176,7 +176,8 @@ async def command_from_text(req: TextCommandRequest):
     """
     logger.info("[API] Received text command: %r", req.text)
 
-    result = route(req.text)
+    from backend.context import browser_context
+    result = route(req.text, {"selectedText": browser_context.selected_text})
 
     if result.command is None:
         return JSONResponse(
