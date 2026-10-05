@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>August — Privacy Policy</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.6;
+      margin: 0;
+      padding: 30px 20px;
+      display: flex;
+      justify-content: center;
+    }
+    .privacy-container {
+      max-width: 780px;
+      width: 100%;
+    }
+    .privacy-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 18px;
+      margin-bottom: 24px;
+    }
+    .privacy-header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .privacy-header img {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+    }
+    .privacy-title {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: var(--text);
+    }
+    .privacy-subtitle {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    h2 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #38bdf8;
+      margin-top: 28px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--surface-2);
+      padding-bottom: 4px;
+    }
+    h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #818cf8;
+      margin-top: 18px;
+      margin-bottom: 6px;
+    }
+    p, li {
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+    ul {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+    li {
+      margin-bottom: 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 12px;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+    }
+    th {
+      background: var(--surface-2);
+      color: #38bdf8;
+    }
+    td {
+      background: var(--surface);
+    }
+    .badge-lock {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      color: #34d399;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      padding: 3px 8px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+    }
+    .back-btn {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: var(--radius);
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.15s;
+    }
+    .back-btn:hover {
+      background: var(--accent);
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="privacy-container">
+    <header class="privacy-header">
+      <div class="privacy-header-left">
+        <img src="icons/icon48.png" alt="August Logo" />
+        <div>
+          <div class="privacy-title">August Privacy Policy</div>
+          <div class="privacy-subtitle">Version 1.1 · Updated October 2026 · Open Source MIT</div>
+        </div>
+      </div>
+      <button class="back-btn" onclick="window.close()">Close</button>
+    </header>
+
+    <div class="badge-lock">🔒 100% On-Device · Zero Remote Audio · Single-Purpose Browser Control</div>
+
+    <p>
+      August is designed from the ground up with a <strong>privacy-first, local-first</strong> architecture.
+      We believe that your browser navigation, voice recordings, and browsing activity are strictly your own personal business.
+    </p>
+
+    <h2>1. Core Privacy Commitments</h2>
+    <ul>
+      <li><strong>Zero Remote Data Collection:</strong> We do not operate user accounts, cloud databases, telemetry endpoints, or analytics servers.</li>
+      <li><strong>Local Speech Recognition:</strong> By default, speech is transcribed inside your browser using Whisper WebAssembly running directly on your CPU. No audio leaves your machine.</li>
+      <li><strong>No Ads or Third-Party Trackers:</strong> The extension contains no ad networks, cookies, or monetization trackers.</li>
+      <li><strong>Single-Purpose Design:</strong> Built exclusively to allow voice-activated browser navigation and control.</li>
+    </ul>
+
+    <h2>2. Audio and Voice Data Handling</h2>
+    <h3>A. In-Browser Whisper (Default & Recommended)</h3>
+    <p>
+      When you press the microphone button or hands-free listening is active, audio is sampled into a temporary memory buffer in your browser (16 kHz mono Float32Array). A dedicated Web Worker processes this buffer using OpenAI's Whisper model (quantized <code>Xenova/whisper-tiny.en</code>) compiled to WebAssembly. The audio buffer is cleared immediately once transcribed.
+    </p>
+    <p>
+      <strong>Audio data is never transmitted over the internet or saved to persistent storage.</strong>
+    </p>
+
+    <h3>B. Chrome Web Speech (Optional Fallback)</h3>
+    <p>
+      If you explicitly select "Chrome Web Speech" in Settings, your browser uses Google's native speech recognition API. In this mode, audio is sent to Google's speech recognition cloud servers under <a href="https://policies.google.com/privacy" target="_blank" style="color:var(--accent)">Google's Privacy Policy</a>.
+    </p>
+
+    <h3>C. Local Python Backend (Optional Developer Mode)</h3>
+    <p>
+      If enabled, communication with the local desktop daemon occurs solely over local loopback (<code>127.0.0.1</code>) using a shared token. No external network traffic is created.
+    </p>
+
+    <h2>3. Chrome Permissions Rationale</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Permission</th>
+          <th>Strictly Defined Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>tabs</code> &amp; <code>activeTab</code></td>
+          <td>To navigate, switch, close, pin, mute, zoom, and manage tabs when instructed by voice (e.g. <em>"open youtube"</em>, <em>"close tab"</em>).</td>
+        </tr>
+        <tr>
+          <td><code>scripting</code></td>
+          <td>To execute page interactions such as scrolling up/down or clicking numbered elements as requested.</td>
+        </tr>
+        <tr>
+          <td><code>sidePanel</code></td>
+          <td>To display the voice assistant interface next to your active webpage without interrupting navigation.</td>
+        </tr>
+        <tr>
+          <td><code>storage</code></td>
+          <td>To save your preferences (TTS voice, speech speed, STT engine) locally on your device.</td>
+        </tr>
+        <tr>
+          <td><code>tts</code></td>
+          <td>To provide optional spoken confirmations using your browser's built-in speech synthesizer.</td>
+        </tr>
+        <tr>
+          <td><code>windows</code> &amp; <code>sessions</code></td>
+          <td>To support commands like <em>"open new window"</em> and <em>"reopen closed tab"</em>.</td>
+        </tr>
+        <tr>
+          <td>Host permissions (<code>&lt;all_urls&gt;</code>)</td>
+          <td>Allows voice scrolling and interaction on any website you are currently browsing.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>4. Data Retention and Control</h2>
+    <p>
+      Recent command history is kept in memory and local storage solely to display activity in the side panel. You can permanently wipe this history at any time with one click via <strong>Settings &rarr; Clear history</strong>.
+    </p>
+
+    <h2>5. Open Source Transparency</h2>
+    <p>
+      The complete source code for August is open source and available for independent security audit on GitHub:
+      <br />
+      <a href="https://github.com/Selak007/August" target="_blank" style="color:var(--accent); font-family:var(--mono);">https://github.com/Selak007/August</a>
+    </p>
+
+    <div style="margin-top: 40px; text-align: center; border-top: 1px solid var(--border); padding-top: 20px; font-size: 12px; color: var(--muted);">
+      August — Private Voice Browser Agent · Open Source Under MIT License
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome to August — Voice Browser Agent</title>
+  <link rel="stylesheet" href="onboarding.css" />
+</head>
+<body>
+  <div class="onboarding-wrap">
+    
+    <!-- Brand Header -->
+    <header class="onboarding-header">
+      <img src="icons/icon128.png" alt="August Logo" class="brand-icon" />
+      <h1 class="onboarding-title">Welcome to August</h1>
+      <p class="onboarding-subtitle">Your private, voice-controlled browser assistant. Browse hands-free with on-device AI.</p>
+    </header>
+
+    <!-- Stepper Navigation -->
+    <nav class="stepper-nav" id="stepper-nav">
+      <button class="step-tab active" data-step="1">
+        <span class="step-num">1</span>
+        <span>Welcome</span>
+      </button>
+      <button class="step-tab" data-step="2">
+        <span class="step-num">2</span>
+        <span>Microphone</span>
+      </button>
+      <button class="step-tab" data-step="3">
+        <span class="step-num">3</span>
+        <span>Shortcuts</span>
+      </button>
+      <button class="step-tab" data-step="4">
+        <span class="step-num">4</span>
+        <span>Voice Test</span>
+      </button>
+      <button class="step-tab" data-step="5">
+        <span class="step-num">5</span>
+        <span>Done</span>
+      </button>
+    </nav>
+
+    <!-- STEP 1: Welcome & Privacy -->
+    <div class="step-card" id="step-card-1">
+      <div class="step-card-header">
+        <h2 class="step-title">Voice control built for privacy</h2>
+        <p class="step-desc">
+          Unlike ordinary voice assistants that stream your audio to cloud servers, August processes voice locally right inside your browser.
+        </p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-box">
+          <span class="feature-box-icon">🔒</span>
+          <span class="feature-box-title">100% In-Browser Whisper</span>
+          <span class="feature-box-desc">Whisper runs locally via WebAssembly on your CPU. Zero audio leaves your machine.</span>
+        </div>
+        <div class="feature-box">
+          <span class="feature-box-icon">⚡</span>
+          <span class="feature-box-title">Instant Browser Control</span>
+          <span class="feature-box-desc">Switch tabs, zoom, scroll, mute, and search naturally without lifting your hands.</span>
+        </div>
+        <div class="feature-box">
+          <span class="feature-box-icon">🛡</span>
+          <span class="feature-box-title">Zero Tracking or Ads</span>
+          <span class="feature-box-desc">No accounts, no telemetry, no tracking cookies, and no data monetization.</span>
+        </div>
+        <div class="feature-box">
+          <span class="feature-box-icon">📖</span>
+          <span class="feature-box-title">Open Source MIT</span>
+          <span class="feature-box-desc">Transparent code publicly inspectable and auditable on GitHub.</span>
+        </div>
+      </div>
+
+      <div class="step-actions">
+        <a href="privacy.html" target="_blank" class="link-sub">Read Privacy Policy &rarr;</a>
+        <button class="btn-primary" id="btn-next-1">Next: Setup Microphone &rarr;</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: Microphone Permission -->
+    <div class="step-card" id="step-card-2" style="display:none">
+      <div class="step-card-header">
+        <h2 class="step-title">Microphone Access</h2>
+        <p class="step-desc">
+          Chrome requires one-time permission to allow August to listen to your voice. Click below to grant access.
+        </p>
+      </div>
+
+      <div class="mic-interactive-box">
+        <button class="btn-primary" id="btn-grant-mic">🎙 Enable Microphone Access</button>
+        <div id="mic-perm-status" style="font-size:13px; color:var(--muted)">Microphone permission not yet granted.</div>
+
+        <div class="vu-meter-wrap" id="vu-wrap" style="display:none">
+          <div class="vu-label" id="vu-label">Live Audio Level: Speak to test</div>
+          <div class="vu-meter">
+            <div class="vu-fill" id="vu-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-actions">
+        <button class="btn-secondary" id="btn-prev-2">&larr; Back</button>
+        <button class="btn-primary" id="btn-next-2" disabled>Next: Keyboard Shortcuts &rarr;</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Pinning & Shortcuts -->
+    <div class="step-card" id="step-card-3" style="display:none">
+      <div class="step-card-header">
+        <h2 class="step-title">Pin &amp; Hotkeys</h2>
+        <p class="step-desc">
+          Quickly activate August anytime with global keyboard shortcuts or the toolbar icon.
+        </p>
+      </div>
+
+      <div class="guide-list">
+        <div class="guide-item">
+          <div class="guide-icon">📌</div>
+          <div class="guide-content">
+            <span class="guide-title">Pin August to your Chrome toolbar</span>
+            <span class="guide-desc">Click Chrome's Extensions puzzle icon (🧩) at top right, find <strong>August</strong>, and click the pin icon.</span>
+          </div>
+        </div>
+        <div class="guide-item">
+          <div class="guide-icon">⌨️</div>
+          <div class="guide-content">
+            <span class="guide-title"><kbd>Ctrl+Shift+Space</kbd> (Mac: <kbd>Cmd+Shift+Space</kbd>)</span>
+            <span class="guide-desc">Open the August Side Panel and instantly start listening to your voice.</span>
+          </div>
+        </div>
+        <div class="guide-item">
+          <div class="guide-icon">🎙</div>
+          <div class="guide-content">
+            <span class="guide-title"><kbd>Alt+Shift+A</kbd></span>
+            <span class="guide-desc">Toggle listening on or off whenever the side panel is open.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-actions">
+        <button class="btn-secondary" id="btn-prev-3">&larr; Back</button>
+        <button class="btn-primary" id="btn-next-3">Next: Try Voice Playground &rarr;</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: Voice Playground -->
+    <div class="step-card" id="step-card-4" style="display:none">
+      <div class="step-card-header">
+        <h2 class="step-title">Try Your First Voice Command</h2>
+        <p class="step-desc">
+          Click the microphone button below or tap an example to test command recognition in real-time!
+        </p>
+      </div>
+
+      <div class="playground-box">
+        <div class="playground-mic-row">
+          <button class="play-mic-btn" id="play-mic-btn" title="Click to Speak">🎙</button>
+          <div>
+            <div class="play-status" id="play-status">Ready to listen</div>
+            <div class="play-substatus" id="play-substatus">Click the microphone to speak a command</div>
+          </div>
+        </div>
+
+        <div style="font-size:12px; color:var(--muted); font-weight:600; margin-top:4px;">Try saying:</div>
+        <div class="chips-row">
+          <button class="chip-btn" data-text="open youtube">"open youtube"</button>
+          <button class="chip-btn" data-text="zoom in">"zoom in"</button>
+          <button class="chip-btn" data-text="scroll down">"scroll down"</button>
+          <button class="chip-btn" data-text="mute tab">"mute tab"</button>
+          <button class="chip-btn" data-text="show numbers">"show numbers"</button>
+        </div>
+
+        <div class="play-output-card" id="play-output" style="display:none">
+          <div class="play-out-label">Command Transcribed &amp; Resolved</div>
+          <div class="play-out-text" id="play-out-text"></div>
+        </div>
+      </div>
+
+      <div class="step-actions">
+        <button class="btn-secondary" id="btn-prev-4">&larr; Back</button>
+        <button class="btn-primary" id="btn-next-4">Next: Finish Setup &rarr;</button>
+      </div>
+    </div>
+
+    <!-- STEP 5: All Set -->
+    <div class="step-card" id="step-card-5" style="display:none">
+      <div class="step-card-header" style="text-align:center; align-items:center;">
+        <span style="font-size:48px; margin-bottom:8px;">🎉</span>
+        <h2 class="step-title">You're All Set!</h2>
+        <p class="step-desc" style="max-width:480px;">
+          August is configured and ready to be your hands-free voice assistant. You can open the side panel whenever you're browsing.
+        </p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-box">
+          <span class="feature-box-icon">♾</span>
+          <span class="feature-box-title">Hands-Free Mode</span>
+          <span class="feature-box-desc">Toggle the infinity icon (♾) to keep August continuously listening.</span>
+        </div>
+        <div class="feature-box">
+          <span class="feature-box-icon">🔊</span>
+          <span class="feature-box-title">Voice Feedback</span>
+          <span class="feature-box-desc">August confirms actions aloud using Chrome's native speech synthesis.</span>
+        </div>
+      </div>
+
+      <div class="step-actions" style="justify-content:center; gap:16px;">
+        <button class="btn-primary btn-success" id="btn-launch-sidepanel">
+          🚀 Open August Side Panel
+        </button>
+        <button class="btn-secondary" id="btn-close-onboarding">
+          Done
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="onboarding.js"></script>
+</body>
+</html>

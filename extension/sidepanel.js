@@ -421,6 +421,10 @@ settingsForm.addEventListener("submit", e => {
 });
 $("clear-history").addEventListener("click", () => chrome.runtime.sendMessage({ type: "AUGUST_CLEAR_HISTORY" }));
 $("edit-shortcuts").addEventListener("click", () => chrome.tabs.create({ url: "chrome://extensions/shortcuts" }));
+$("open-tour")?.addEventListener("click", () => chrome.tabs.create({ url: chrome.runtime.getURL("onboarding.html") }));
+$("open-privacy")?.addEventListener("click", () => chrome.tabs.create({ url: chrome.runtime.getURL("privacy.html") }));
+$("footer-tour")?.addEventListener("click", e => { e.preventDefault(); chrome.tabs.create({ url: chrome.runtime.getURL("onboarding.html") }); });
+$("footer-privacy")?.addEventListener("click", e => { e.preventDefault(); chrome.tabs.create({ url: chrome.runtime.getURL("privacy.html") }); });
 
 handsFreeBtn.addEventListener("click", () => {
   const next = !lastState.handsFree;

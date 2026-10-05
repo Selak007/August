@@ -89,6 +89,14 @@ body {
   font-weight: 800;
   letter-spacing: 0.14em;
   color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.logo-icon {
+  border-radius: 4px;
+  vertical-align: middle;
 }
 
 .panel-footer {

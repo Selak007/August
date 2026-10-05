@@ -179,6 +179,14 @@ CI runs all of the above on every PR (`.github/workflows/ci.yml`).
 
 ---
 
+## 🔒 Privacy & Store Listing
+
+- **Privacy Policy**: [PRIVACY_POLICY.md](PRIVACY_POLICY.md) — 100% on-device speech processing with zero remote data collection.
+- **Onboarding Walkthrough**: `extension/onboarding.html` guides first-run microphone setup and interactive voice practice.
+- **Store Assets**: High-resolution brand icons and promotional tiles located in `store-assets/`.
+
+---
+
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.

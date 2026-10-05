@@ -12,7 +12,7 @@
     <!-- Header -->
     <header class="panel-header">
       <div class="header-left">
-        <span class="logo">◉ AUGUST</span>
+        <span class="logo"><img src="icons/icon32.png" width="16" height="16" alt="August" class="logo-icon" /> AUGUST</span>
         <span class="badge badge-ok" id="status-badge">● Standalone Ready</span>
       </div>
       <div class="header-right">
@@ -111,7 +111,9 @@
         <div class="settings-actions">
           <button type="submit" class="btn-primary">Save</button>
           <button type="button" class="link-btn" id="clear-history">Clear history</button>
-          <button type="button" class="link-btn" id="edit-shortcuts">Keyboard shortcuts</button>
+          <button type="button" class="link-btn" id="edit-shortcuts">Shortcuts</button>
+          <button type="button" class="link-btn" id="open-tour">Tour</button>
+          <button type="button" class="link-btn" id="open-privacy">Privacy</button>
         </div>
       </form>
     </section>
@@ -184,7 +186,11 @@
 
     <!-- Footer -->
     <footer class="panel-footer">
-      <span>August 1.1 · Local &amp; private · <span id="backend-footer">standalone</span></span>
+      <div>August 1.1 · Local &amp; private · <span id="backend-footer">standalone</span></div>
+      <div style="margin-top: 4px;">
+        <a href="#" id="footer-tour" style="color:var(--muted); text-decoration:underline; font-size:10px; margin-right:8px;">Tour</a> · 
+        <a href="#" id="footer-privacy" style="color:var(--muted); text-decoration:underline; font-size:10px;">Privacy Policy</a>
+      </div>
     </footer>
   </div>
 

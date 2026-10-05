@@ -507,10 +507,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case "AUGUST_STOP_SPEAKING":
       stopSpeaking();
       return false;
+    case "AUGUST_OPEN_ONBOARDING":
+      chrome.tabs.create({ url: chrome.runtime.getURL("onboarding.html") });
+      sendResponse({ ok: true });
+      return false;
+    case "AUGUST_OPEN_PRIVACY":
+      chrome.tabs.create({ url: chrome.runtime.getURL("privacy.html") });
+      sendResponse({ ok: true });
+      return false;
     default:
       return false;
   }
 });
 
-chrome.runtime.onInstalled.addListener(() => refreshContext());
+chrome.runtime.onInstalled.addListener(details => {
+  refreshContext();
+  if (details.reason === "install") {
+    chrome.tabs.create({ url: chrome.runtime.getURL("onboarding.html") });
+  }
+});
 chrome.runtime.onStartup.addListener(() => refreshContext());
